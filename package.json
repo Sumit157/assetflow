@@ -1,0 +1,40 @@
+{
+  "name": "assetflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant Asset + Inventory Management System",
+  "packageManager": "pnpm@9.11.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm build:packages && concurrently --kill-others -n packages,api,web -c blue,magenta,green \"pnpm dev:packages\" \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:packages": "tsc -b packages/types packages/shared --watch --preserveWatchOutput",
+    "dev:api": "pnpm --filter @assetflow/api dev",
+    "dev:web": "pnpm --filter @assetflow/web dev",
+    "build:packages": "tsc -b packages/types packages/shared",
+    "build": "pnpm build:packages && pnpm --filter @assetflow/api build && pnpm --filter @assetflow/web build",
+    "typecheck": "pnpm build:packages && tsc -p packages/shared/tsconfig.test.json && tsc -p apps/api/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm build:packages && pnpm -r --if-present test",
+    "infra:up": "docker compose up -d --wait mongo redis",
+    "infra:down": "docker compose down",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "concurrently": "^9.2.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# Environment (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Tooling
+.vite/
+*.local
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Docker volumes (local database state)
+.infra/data/

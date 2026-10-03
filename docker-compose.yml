@@ -1,0 +1,88 @@
+name: assetflow
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:27018:27017'
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "quit(db.adminCommand('ping').ok ? 0 : 2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    init: true
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/assetflow
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:5175
+      LOG_LEVEL: debug
+    ports:
+      - '127.0.0.1:4000:4000'
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+      - /repo/apps/api/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/types/node_modules
+    command: ['sh', '-c', 'pnpm build:packages && pnpm dev:api']
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/api/v1/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    init: true
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_PROXY_TARGET: http://api:4000
+    ports:
+      - '127.0.0.1:5175:5175'
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+      - /repo/apps/web/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/types/node_modules
+    command: ['sh', '-c', 'pnpm --filter @assetflow/web exec vite --host 0.0.0.0']
+
+volumes:
+  mongo_data:
+  redis_data:

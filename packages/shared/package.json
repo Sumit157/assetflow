@@ -1,0 +1,31 @@
+{
+  "name": "@assetflow/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared runtime utilities and constants for AssetFlow workspaces",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@assetflow/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5",
+    "vitest": "^5.0.3"
+  }
+}
