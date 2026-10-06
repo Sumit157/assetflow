@@ -18,3 +18,19 @@ export function validateBody(schema: ZodType): RequestHandler {
     next();
   };
 }
+
+export function validateQuery(schema: ZodType): RequestHandler {
+  return (req, _res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const details = result.error.issues.map((issue) => ({
+        path: issue.path.map(String).join('.') || 'query',
+        message: issue.message,
+      }));
+      next(new HttpError(400, ERROR_CODES.VALIDATION_ERROR, 'Request validation failed.', details));
+      return;
+    }
+    req.validatedQuery = result.data;
+    next();
+  };
+}

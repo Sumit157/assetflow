@@ -5,6 +5,7 @@ declare global {
     interface Request {
       id: string;
       auth?: import('../types/auth-context.js').AuthContext;
+      validatedQuery?: unknown;
     }
   }
 }

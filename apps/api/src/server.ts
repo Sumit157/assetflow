@@ -5,12 +5,15 @@ import { logger } from './lib/logger.js';
 import { connectMongo, disconnectMongo, pingMongo } from './lib/mongo.js';
 import { createRedisClient } from './lib/redis.js';
 import { createAuditService } from './services/audit-service.js';
+import { createAssetCategoryService } from './services/asset-category-service.js';
+import { createAssetService } from './services/asset-service.js';
 import { createAuthService } from './services/auth-service.js';
 import { createCredentialService } from './services/credential-service.js';
 import { createEmailService } from './services/email/email-service.js';
 import { createEmailTransport } from './services/email/transport.js';
 import { createHealthService } from './services/health-service.js';
 import { createInvitationService } from './services/invitation-service.js';
+import { createLocationService } from './services/location-service.js';
 import { createMemberService } from './services/member-service.js';
 import { createOrganisationService } from './services/organisation-service.js';
 
@@ -36,6 +39,9 @@ async function main(): Promise<void> {
     organisations: createOrganisationService({ audit }),
     members: createMemberService({ audit }),
     invitations: createInvitationService({ email, audit }),
+    assetCategories: createAssetCategoryService({ audit }),
+    locations: createLocationService({ audit }),
+    assets: createAssetService({ audit }),
   });
 
   const server: Server = app.listen(env.PORT, () => {

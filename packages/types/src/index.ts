@@ -24,3 +24,15 @@ export type {
   InvitationPreview,
   AuditAction,
 } from './auth.js';
+export type {
+  AssetStatus,
+  AssetCondition,
+  AssetCategoryPublic,
+  LocationPublic,
+  AssetPublic,
+  AssetAssignmentPublic,
+  AssetTransferPublic,
+  AssetHistory,
+  AssetSortField,
+  AssetListQuery,
+} from './assets.js';

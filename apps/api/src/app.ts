@@ -9,10 +9,13 @@ import { accessLog } from './middleware/access-log.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { requestId } from './middleware/request-id.js';
 import { createApiRouter } from './routes/index.js';
+import type { AssetCategoryService } from './services/asset-category-service.js';
+import type { AssetService } from './services/asset-service.js';
 import type { AuthService } from './services/auth-service.js';
 import type { CredentialService } from './services/credential-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { InvitationService } from './services/invitation-service.js';
+import type { LocationService } from './services/location-service.js';
 import type { MemberService } from './services/member-service.js';
 import type { OrganisationService } from './services/organisation-service.js';
 
@@ -23,6 +26,9 @@ export interface AppServices {
   organisations: OrganisationService;
   members: MemberService;
   invitations: InvitationService;
+  assetCategories: AssetCategoryService;
+  locations: LocationService;
+  assets: AssetService;
 }
 
 function createRateLimiter(limit: number, windowMs: number, message: string) {

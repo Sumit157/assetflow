@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth-store';
 
 const NAV_ITEMS = [
   { to: '/app', end: true, label: 'Overview' },
+  { to: '/app/assets', label: 'Assets' },
   { to: '/app/organisation', label: 'Organisation' },
   { to: '/app/members', label: 'Members' },
   { to: '/app/account', label: 'Account' },

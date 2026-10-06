@@ -127,4 +127,17 @@ export type AuditAction =
   | 'member.removed'
   | 'invitation.created'
   | 'invitation.accepted'
-  | 'invitation.revoked';
+  | 'invitation.revoked'
+  | 'asset_category.created'
+  | 'asset_category.updated'
+  | 'asset_category.deleted'
+  | 'location.created'
+  | 'location.updated'
+  | 'location.deleted'
+  | 'asset.created'
+  | 'asset.updated'
+  | 'asset.deleted'
+  | 'asset.assigned'
+  | 'asset.returned'
+  | 'asset.transferred'
+  | 'asset.retired';

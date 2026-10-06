@@ -157,17 +157,86 @@ tenant).
 
 ## Assets
 
-- GET `/assets`
-- POST `/assets`
-- GET `/assets/:id`
-- PATCH `/assets/:id`
-- DELETE `/assets/:id`
-- POST `/assets/:id/assign`
-- POST `/assets/:id/transfer`
-- POST `/assets/:id/return`
-- GET `/assets/:id/history`
-- GET `/assets/:id/maintenance`
-- POST `/assets/:id/documents`
+Asset, category and location endpoints are tenant-scoped by the `orgId` claim in the
+access token — there is no organisation id in the path. Reads require `assets.view`;
+writes are gated per operation (see below). Ids that do not exist **or belong to another
+organisation** answer `404 NOT_FOUND`.
+
+### Asset categories
+
+- GET `/asset-categories` — permission `assets.view`.
+  `200 AssetCategoryPublic[]` (`{ "id", "organisationId", "name", "description",
+"assetCount", "createdAt", "updatedAt" }`)
+- POST `/asset-categories` — permission `assets.create`. Body: `{ "name",
+"description"? }`.
+  `201` · `400 VALIDATION_ERROR` · `409 CONFLICT` (name already used in this organisation)
+- PATCH `/asset-categories/:id` — permission `assets.update`. Body: `{ "name"?,
+"description"? }`. `200` · `404` · `409 CONFLICT` (duplicate name)
+- DELETE `/asset-categories/:id` — permission `assets.delete`.
+  `200 { "data": null }` · `404` · `409 CONFLICT` (category still assigned to assets)
+
+### Locations
+
+- GET `/locations` — permission `assets.view`.
+  `200 LocationPublic[]` (`{ "id", "organisationId", "name", "code", "assetCount", ... }`)
+- POST `/locations` — permission `assets.create`. Body: `{ "name", "code"? }`.
+  `201` · `400` · `409 CONFLICT` (duplicate name)
+- PATCH `/locations/:id` — permission `assets.update`. Body: `{ "name"?, "code"? }`.
+  `200` · `404` · `409 CONFLICT` (duplicate name)
+- DELETE `/locations/:id` — permission `assets.delete`.
+  `200` · `404` · `409 CONFLICT` (location still holds assets)
+
+### Asset CRUD
+
+- GET `/assets` — permission `assets.view`. Query parameters:
+  `page` (≥1, default 1), `limit` (1–100, default 20), `q` (case-insensitive match on
+  name, asset tag, serial number or barcode), `status` (`available|assigned|retired`),
+  `categoryId`, `locationId`, `assignedTo` (user id), `sortBy`
+  (`createdAt|name|assetTag`, default `createdAt`), `sortDir` (`asc|desc`, default `desc`).
+  `200 Paginated<AssetPublic>` — `{ "items", "page", "limit", "total", "totalPages" }`.
+  Hydrated rows carry `categoryName`, `locationName` and `assignedToName`.
+- POST `/assets` — permission `assets.create`. Body: `{ "name", "assetTag",
+"description"? , "categoryId"?, "locationId"?, "serialNumber"?, "condition"? }`.
+  `barcode` is generated equal to `assetTag` and frozen afterwards (the QR payload).
+  `201 AssetPublic` · `400` · `404` (unknown category/location in this organisation) ·
+  `409 CONFLICT` (duplicate asset tag or serial number)
+- GET `/assets/:id` — permission `assets.view`. `200 AssetPublic` · `404`
+- PATCH `/assets/:id` — permission `assets.update`. Body: same fields as create, all
+  optional. `200` · `400` · `404` · `409 CONFLICT` (duplicate tag/serial)
+- DELETE `/assets/:id` — permission `assets.delete`. Only assets without assignment or
+  transfer history can be deleted; anything that has been in use must be retired instead.
+  `200 { "data": null }` · `404` · `409 CONFLICT` (asset has history)
+
+### Lifecycle
+
+Status transitions are enforced server-side (`available → assigned → available`,
+`available → retired`); every transition writes an immutable history record.
+
+- POST `/assets/:id/assign` — permission `assets.assign`. Body:
+  `{ "assignedToUserId", "notes"? }`. Target must be a member of the organisation.
+  `200 AssetPublic` (status `assigned`) · `400` · `404` ·
+  `409 CONFLICT` (already assigned / retired / target is not a member)
+- POST `/assets/:id/return` — permission `assets.assign`. Body:
+  `{ "condition"? , "notes"? }`. Closes the open assignment and updates the condition.
+  `200` (status `available`) · `400` · `404` · `409 CONFLICT` (not currently assigned)
+- POST `/assets/:id/transfer` — permission `assets.transfer`. Body:
+  `{ "toUserId", "notes"? }`. Moves custody to another member without leaving
+  `assigned`. `200` · `400` · `404` · `409 CONFLICT` (not assigned / same person /
+  target is not a member)
+- POST `/assets/:id/retire` — permission `assets.update`. Body: `{ "reason"? }`.
+  Only available assets can be retired. `200` (status `retired`) · `400` · `404` ·
+  `409 CONFLICT` (assigned — return it first / already retired)
+
+### History
+
+- GET `/assets/:id/history` — permission `assets.view`.
+  `200 { "assignments": AssetAssignmentPublic[], "transfers": AssetTransferPublic[] }`,
+  newest first. Assignment and transfer records are append-only: closing an assignment
+  sets `returnedAt`/`returnedByName`/`returnCondition` once and never rewrites
+  `assignedAt`, `assignedToUserId` or the acting users. Transfers never modify
+  assignment rows — they close the open row and open a new one.
+- GET `/assets/:id/maintenance` — planned (later phase)
+- POST `/assets/:id/documents` — planned (later phase)
 
 ## Inventory
 

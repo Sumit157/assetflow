@@ -6,9 +6,11 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     // Integration tests share one database; keep files serial.
     fileParallelism: false,
-    // Generous enough for a freshly started (cold) MongoDB.
-    testTimeout: 20_000,
-    hookTimeout: 20_000,
+    // Each file drops the database, so mongoose re-runs autoIndex for every
+    // model (~30 index builds) — on Docker-Desktop MongoDB this storm takes
+    // 15-30s and blocks the first write, so both timeouts need real headroom.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',

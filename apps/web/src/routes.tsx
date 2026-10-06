@@ -7,6 +7,11 @@ import {
   RootLayout,
 } from './components/route-guards';
 import { AccountPage } from './pages/app/account-page';
+import { AssetCategoriesPage } from './pages/app/asset-categories-page';
+import { AssetDetailPage } from './pages/app/asset-detail-page';
+import { AssetFormPage } from './pages/app/asset-form-page';
+import { AssetsPage } from './pages/app/assets-page';
+import { LocationsPage } from './pages/app/locations-page';
 import { MembersPage } from './pages/app/members-page';
 import { OrganisationPage } from './pages/app/organisation-page';
 import { OverviewPage } from './pages/app/overview-page';
@@ -54,6 +59,12 @@ export const routeConfig = [
               { index: true, element: <OverviewPage /> },
               { path: 'organisation', element: <OrganisationPage /> },
               { path: 'members', element: <MembersPage /> },
+              { path: 'assets', element: <AssetsPage /> },
+              { path: 'assets/new', element: <AssetFormPage /> },
+              { path: 'assets/categories', element: <AssetCategoriesPage /> },
+              { path: 'assets/locations', element: <LocationsPage /> },
+              { path: 'assets/:assetId', element: <AssetDetailPage /> },
+              { path: 'assets/:assetId/edit', element: <AssetFormPage /> },
               { path: 'account', element: <AccountPage /> },
             ],
           },

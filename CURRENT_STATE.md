@@ -3,9 +3,9 @@
 Persistent handoff document between coding agents. Read this before starting work;
 update it when a phase or significant feature completes.
 
-- **Last updated:** 2026-10-03
-- **Completed phases:** Phase 0 (Foundation), Phase 1 (Authentication and tenancy)
-- **Next phase:** Phase 2 — Assets (`docs/ROADMAP.md`)
+- **Last updated:** 2026-10-06
+- **Completed phases:** Phase 0 (Foundation), Phase 1 (Authentication and tenancy), Phase 2 (Assets)
+- **Next phase:** Phase 3 — Inventory (`docs/ROADMAP.md`)
 
 ## How to run and verify
 
@@ -14,7 +14,7 @@ pnpm install            # if dev scripts fail with "'vite' is not recognized", r
 pnpm infra:up           # mongo 127.0.0.1:27018, redis 127.0.0.1:6379
 pnpm dev                # API :4000 + web :5175 (Vite proxies /api -> API; cookies same-origin)
 pnpm typecheck && pnpm lint && pnpm format:check
-pnpm test               # shared (16) + api (85) + web (39) = 140 tests; needs infra:up
+pnpm test               # shared (16) + api (120) + web (53) = 189 tests; needs infra:up
 pnpm docker:up          # full Compose stack (web 5175, api 4000, mongo 27018, redis 6379)
 ```
 
@@ -79,21 +79,79 @@ test infra (Vitest everywhere, `fileParallelism: false` in api).
 - Tests: 39 web tests (route guards, login page, api client refresh semantics,
   auth store, App boot/sign-out/theme, HealthPanel).
 
-## Verification status (2026-10-03, Phase 1 exit)
+## Phase 2 — Assets (complete)
+
+### Backend
+
+- **Models:** `AssetCategory`, `Location` (flat, `code` optional, unique name per org),
+  `Asset`, `AssetAssignment`, `AssetTransfer` (`immutable: true` on the last two;
+  closed by `returnedAt`). Asset fields: name, assetTag (unique/org), barcode
+  (unique/org, generated equal to `assetTag` at creation and frozen), description,
+  categoryId, locationId, serialNumber (partial unique on `$type:'string'`),
+  condition `good|fair|poor`, status `available|assigned|retired`,
+  assignedToUserId (+ hydrated `assignedToName`), retiredAt, retirementReason.
+  Money/purchase fields deliberately deferred (not in Phase 2 roadmap).
+- **Indexes:** 7 on assets (unique org+tag, org+barcode, partial org+serial, plus
+  status/category/location/assignee list indexes), unique org+name on categories and
+  locations, unique org+serial on assignments/transfers (append-only).
+- **Endpoints** (full contract in `docs/API.md`): `/asset-categories` (GET=assets.view,
+  POST=assets.create, PATCH=assets.update, DELETE=assets.delete, 409 when in use),
+  `/locations` (same matrix), `/assets` CRUD + `GET /:id/history` +
+  `POST /:id/{assign,return,transfer,retire}` (assign/return=assets.assign,
+  transfer=assets.transfer, retire=assets.update). DELETE on an asset with any
+  assignment/transfer history → 409 "retire instead". Org id comes from the JWT claim —
+  no org in path; foreign/malformed ids → 404 via `requireObjectId`/`requireOrgId`.
+- **Lifecycle rules (service layer):** status changes via `findOneAndUpdate` CAS +
+  ordered history writes with best-effort revert (standalone mongo — no transactions);
+  assign target must be an org member (409); transfer requires status `assigned`,
+  `toUserId` ≠ current assignee; retire only from `available`; return may update
+  condition. Assignment rows are append-only: closing sets returnedAt/returnedByName/
+  returnCondition once; transfers close the open row and open a new one — historical
+  assignedTo/assignedAt/actors never rewritten.
+- **List query:** page/limit(1-100)/q(escaped regex over name|tag|serial|barcode)/
+  status/categoryId/locationId/assignedTo/sortBy{createdAt,name,assetTag}/sortDir,
+  validated by new `validateQuery` middleware writing `req.validatedQuery`
+  (Express 5 `req.query` is read-only). Responses: `Paginated<AssetPublic>`
+  `{items,page,limit,total,totalPages}` with read-time hydration of category/location/
+  assignee names (batched maps).
+- **Audit:** `AuditAction` extended with `asset_category.*`, `location.*`, `asset.*`
+  (created/updated/deleted/assigned/returned/transferred/retired). Reuses existing
+  error codes (VALIDATION_ERROR/NOT_FOUND/CONFLICT/FORBIDDEN) — no new codes.
+
+### Frontend
+
+- `features/assets/api.ts`: TanStack hooks for asset list/detail/history, create/update/
+  delete, assign/return/transfer/retire, categories and locations CRUD. Query keys are
+  org-scoped (`['assets', orgId, params]` etc.) so an org switch never shows another
+  tenant's cache; mutations invalidate list+detail+history+taxonomy keys.
+- Pages: `assets-page` (search with 300 ms debounce, status/category/location filters,
+  pagination, empty/error states), `asset-form-page` (create + edit behind
+  assets.create/assets.update), `asset-detail-page` (details, QR via `qrcode.react`
+  rendering the frozen barcode, lifecycle action forms gated by permission + status,
+  merged assignment/transfer history timeline, 2-step delete), `asset-categories-page`
+  and `locations-page` (create/edit/delete with inline forms and 409 error surfacing).
+- Nav: "Assets" added to `AppShell`; routes `/app/assets`, `/assets/new`,
+  `/assets/categories`, `/assets/locations`, `/assets/:id`, `/assets/:id/edit`.
+  `RequirePermission` wraps pages (`assets.view` / `assets.create` / `assets.update`);
+  inline buttons use `hasPermission` (viewers see read-only UI — API re-checks anyway).
+- QR decision: no server render endpoint — `barcode` string is the QR payload
+  (client-rendered), scanning = search box. Dependency added: `qrcode.react`.
+
+## Verification status (2026-10-06, Phase 2 exit)
 
 - `pnpm typecheck` ✓ · `pnpm lint` ✓ · `pnpm format:check` ✓
-- `pnpm test` ✓ — shared 16 + api 85 + web 39 = **140 passing**
-- `pnpm --filter @assetflow/web build` ✓ (chunk-size warning only, 514 kB main chunk)
-- Local dev E2E through proxy (`localhost:5175/api/v1`): register → me → refresh →
-  members ✓; SPA fallback `/login` ✓
-- Docker Compose E2E (`docker compose up --build`): health, register, invite,
-  public preview, invitee register, accept, switch-org, cross-tenant 403,
-  member list (2 roles), VIEWER invite attempt 403 ✓; log-transport emails emit
-  correct `localhost:5175` links ✓
-- Docs updated: `docs/API.md` (full Phase 1 contract), `docs/SECURITY.md`
-  (scrypt/JWT/rotation details, role→permission matrix, known tradeoffs),
-  `docs/ARCHITECTURE.md` (email deferral, same-origin proxy strategy),
-  `README.md` (tests need infra:up, env vars, ports)
+- `pnpm test` ✓ — shared 16 + api 120 + web 53 = **189 passing**
+  (api: 35 new asset/taxonomy/lifecycle tests; web: 14 new asset page tests)
+- `pnpm --filter @assetflow/web build` ✓ (chunk-size warning only, 569 kB main chunk)
+- Local dev E2E through proxy (`localhost:5175/api/v1`): register → create category →
+  create location → create asset (barcode=tag, hydrated names) → assign → open history
+  row → filtered list search ✓; `GET /health/live` ✓
+- Docs updated: `docs/API.md` (full Phase 2 contract: categories, locations, CRUD,
+  lifecycle, history)
+- Phase 1 exit (2026-10-03) had additionally verified: full Docker Compose E2E
+  (register/invite/accept/switch-org/cross-tenant 403/RBAC 403, log-transport email
+  links), `docs/SECURITY.md` + `docs/ARCHITECTURE.md` + `README.md` updates — all
+  still valid; 140 tests then, 189 now.
 
 ## Known issues and technical debt
 
@@ -106,10 +164,14 @@ test infra (Vitest everywhere, `fileParallelism: false` in api).
 2. **Host pnpm bin shims vanished once** (`apps/web/node_modules/.bin/vite.cmd`
    disappeared; dev server failed with "'vite' is not recognized"). Fix: run
    `pnpm install` (recreates shims, 5 s, "Already up to date").
-3. **Cold-Mongo hook timeout:** one full-suite run timed out a 15 s
-   `beforeAll` in `invitations.test.ts` right after recreating the mongo
-   container. Mitigated: api `testTimeout`/`hookTimeout` raised to 20 s in
-   `apps/api/vitest.config.ts`. Watch for recurrence in CI.
+3. **Slow tests on this machine (root-caused, mitigated):** api `beforeAll` hooks kept
+   timing out because every test file drops `assetflow_test`, forcing mongoose
+   `autoIndex` to rebuild ~30 indexes; on Docker-Desktop MongoDB each `createIndex`
+   command costs hundreds of ms and the storm (15-30 s) blocks the first write.
+   Phase 2 added 5 models (+15 indexes), pushing hooks past the old 20 s limit.
+   Mitigated: `testTimeout`/`hookTimeout` now **60 s** in `apps/api/vitest.config.ts`
+   (full api suite ≈ 4.5 min). Do not lower without a different strategy (e.g.
+   shared non-dropped DB with unique data prefixes).
 4. **No git commits yet** — repo initialised but never committed; commit only
    when explicitly asked.
 5. **Background dev servers** are launched via helper cmd files in
@@ -120,9 +182,15 @@ test infra (Vitest everywhere, `fileParallelism: false` in api).
    the start-*.cmd root) **scoped strictly to this project**, then relaunch.
    Orphaned `tsx watch` children can hold the log file open and silently block
    new launches (log not truncating is the symptom).
-6. Web main chunk is 514 kB (>500 kB warning) — code-split before Phase 8.
+6. Web main chunk is 569 kB (>500 kB warning) — code-split before Phase 8.
 7. `permissionsForRole(role)` still returns `undefined` for unknown roles
    (only `hasPermission` was hardened this phase).
+8. **Web vitest cache wedge:** adding `qrcode.react` invalidated
+   `apps/web/node_modules/.vite`; vitest then failed every worker with
+   "Failed to start forks worker / Timeout waiting for worker to respond".
+   Fix: delete `apps/web/node_modules/.vite` (workers boot again; jsdom cold boot
+   on this machine is ~60 s — the stale cache pushed it over the pool timeout).
+   Symptom first, not a code bug — check the cache before debugging test files.
 
 ## Architectural decisions (Phase 1)
 
@@ -139,17 +207,44 @@ test infra (Vitest everywhere, `fileParallelism: false` in api).
 - Invitation preview returns 200 with `status` for revoked/expired links
   (400 only for unknown tokens).
 
-## Next steps — Phase 2 (Assets)
+## Architectural decisions (Phase 2)
 
-1. Read `docs/ROADMAP.md` Phase 2 and the relevant sections of `docs/DATABASE.md`
-   (Asset, AssetCategory, AssetAssignment, Location), `docs/API.md` (Assets
-   section), `docs/UI.md`, `docs/SECURITY.md`.
-2. Inspect existing implementation (auth/tenancy layers are stable — reuse
-   `requireActiveOrganisation`, `requirePermission`, audit service, error codes).
-3. Vertical slice order suggestion: categories + locations → asset CRUD +
-   list/detail UI → assignment/return (immutable history) → transfer → QR/barcode
-   (generate + scan UI) → tests (service, route, permission, tenant isolation).
-4. Every asset read/update is tenant-scoped; assignment/transfer/return must
-   append immutable history rows — never overwrite.
+- Asset endpoints are **org-claim scoped** (no org id in the path) — the JWT `orgId`
+  claim is the single tenant boundary; `requireOrgId` (services/org-context.ts)
+  throws 403 ORGANISATION_REQUIRED when absent.
+- History immutability: `AssetAssignment`/`AssetTransfer` schemas use
+  `immutable: true`; closure fields (returnedAt/returnedByName/returnCondition) are
+  written once. CAS on `status` + best-effort revert instead of transactions
+  (standalone mongo; document if ever moving to replica set — then use sessions).
+- Barcode = assetTag generated at creation, never rewritten — it is the QR payload;
+  no server-side QR endpoint (keeps API surface small, QR rendered client-side with
+  `qrcode.react`).
+- Read-time hydration (category/location/assignee names) instead of storing
+  denormalised names; assignment rows keep their historical names immutable.
+- `validateQuery` middleware added (Express 5 makes `req.query` read-only);
+  validated payload lands on `req.validatedQuery`.
+- Categories/locations DELETE return 409 when in use — matches the roadmap's
+  "retire instead of delete" philosophy and keeps referential sanity without
+  cascade rules.
+- Web query keys include `orgId` even though endpoints are claim-scoped — prevents
+  cross-tenant cache bleed after `switch-org` (no global query reset exists yet).
+
+## Next steps — Phase 3 (Inventory)
+
+1. Read `docs/ROADMAP.md` Phase 3 (products, categories, warehouses, locations,
+   stock levels, stock adjustments, stock ledger, transfers, low-stock alerts) and
+   the relevant sections of `docs/DATABASE.md` (Product, Warehouse, InventoryItem,
+   StockMovement, StockTransfer — especially **Stock integrity**), `docs/API.md`
+   (Inventory section), `docs/UI.md`, `docs/SECURITY.md`.
+2. Inspect existing implementation: Phase 2 patterns to reuse — claim-scoped
+   endpoints + `requireOrgId`, `validateQuery`, CAS + immutable-append history
+   (the stock ledger mirrors asset history), org-scoped query keys on the web.
+3. Every quantity change MUST create an immutable `StockMovement`
+   (docs/DATABASE.md "Never modify stock without creating a stock movement");
+   decide up front whether adjustments need multi-doc atomicity — if yes, this is
+   the phase where transactions/replica-set requirements must be re-evaluated.
+4. Vertical slice suggestion: products + categories → warehouses/locations →
+   stock levels + adjustments with ledger → transfers → low-stock alerts → tests
+   (service, route, permission, tenant isolation) + docs.
 5. Run `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` before
    finishing; update this file and the docs if behaviour changes.
