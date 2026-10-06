@@ -25,14 +25,14 @@ pnpm infra:up        # MongoDB (127.0.0.1:27018) + Redis (127.0.0.1:6379)
 pnpm dev             # API (:4000) + web (:5175), watch mode
 ```
 
-Open http://localhost:5175 â€” the home screen shows live API health status.
+Open http://localhost:5175 the home screen shows live API health status.
 
 Copy `apps/api/.env.example` to `apps/api/.env` if you want to override defaults
 (the built-in defaults work with the Compose infrastructure).
 
 Useful overrides: `API_PROXY_TARGET` (web dev proxy target, default
 `http://localhost:4000`), `CORS_ORIGINS` (default `http://localhost:5175`),
-`VITE_API_BASE_URL` (leave unset to use the proxy â€” cookies stay same-origin).
+`VITE_API_BASE_URL` (leave unset to use the proxy cookies stay same-origin).
 
 ## Quick start (full Docker stack)
 
@@ -56,7 +56,7 @@ pnpm docker:down     # stops the stack (data volumes persist)
 
 ### Tests
 
-The API integration tests need MongoDB (and readiness Redis) â€” start them first:
+The API integration tests need MongoDB (and readiness Redis) start them first:
 
 ```bash
 pnpm infra:up     # mongo on 127.0.0.1:27018 (test DB assetflow_test), redis on 6379
@@ -72,7 +72,7 @@ tests are pure jsdom unit tests and need no services.
 | ----- | ---------------------- | ---------------------------------------------------------------------------- |
 | 4000  | API (local and Docker) | Single stable port for both modes                                            |
 | 5175  | Web (local and Docker) | Dedicated port; avoids clashes with other projects on Vite's default 5173    |
-| 27018 | MongoDB (host-facing)  | Host already runs a MongoDB on 27017; Compose maps 27018 â†’ container 27017 |
+| 27018 | MongoDB (host-facing)  | Host already runs a MongoDB on 27017; Compose maps 27018 container 27017 |
 | 6379  | Redis                  | Default port                                                                 |
 
 Ports are bound to `127.0.0.1` only.
